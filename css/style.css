@@ -625,8 +625,8 @@ select:focus { border-color: var(--accent); }
 .tx-item::before {
   content: '';
   position: absolute;
-  top: -6px; left: 16px;
-  width: 13px; height: 9px;
+  top: -7px; left: 14px;
+  width: 13px; height: 10px;
   background: var(--accent);
   border-radius: 50% 50% 40% 40%;
   opacity: 0.7;
@@ -635,17 +635,17 @@ select:focus { border-color: var(--accent); }
 .tx-item::after {
   content: '';
   position: absolute;
-  top: -6px; left: 32px;
-  width: 9px; height: 7px;
+  top: -6px; left: 30px;
+  width: 10px; height: 8px;
   background: var(--accent);
   border-radius: 50% 50% 40% 40%;
   opacity: 0.45;
 }
 
-.tx-item.income::before { background: var(--green); }
-.tx-item.income::after  { background: var(--green); }
+.tx-item.income::before,
+.tx-item.income::after { background: var(--green); }
 
-.tx-item:hover { border-color: var(--accent); }
+.tx-item:hover { border-color: var(--accent); transform: translateY(-1px); }
 
 .tx-icon {
   font-size: 1.4rem;
