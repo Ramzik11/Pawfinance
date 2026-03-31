@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PawFinance 🐾</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>" />
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ===== LOGIN PAGE ===== -->
+<div id="loginPage" style="display:none">
+  <div class="login-card">
+    <div class="login-paws">🐾</div>
+    <div class="login-logo">PawFinance</div>
+    <div class="login-subtitle">Ваши финансы под лапой 🐶</div>
+
+    <div class="input-group">
+      <label class="input-label">Email</label>
+      <input type="email" id="loginEmail" class="input-field" placeholder="you@example.com" autocomplete="email" />
+    </div>
+
+    <div class="input-group">
+      <label class="input-label">PIN-код (4-6 цифр)</label>
+      <div class="pin-inputs" id="pinInputs">
+        <input type="password" inputmode="numeric" maxlength="1" class="pin-digit" />
+        <input type="password" inputmode="numeric" maxlength="1" class="pin-digit" />
+        <input type="password" inputmode="numeric" maxlength="1" class="pin-digit" />
+        <input type="password" inputmode="numeric" maxlength="1" class="pin-digit" />
+        <input type="password" inputmode="numeric" maxlength="1" class="pin-digit" />
+        <input type="password" inputmode="numeric" maxlength="1" class="pin-digit" />
+      </div>
+    </div>
+
+    <button class="btn-primary" id="loginBtn">🐾 Войти / Зарегистрироваться</button>
+    <div class="login-error" id="loginError"></div>
+    <div style="text-align:center;color:var(--text2);font-size:0.8rem;margin-top:1.2rem;">
+      Новый пользователь? Просто введите email и PIN — аккаунт создастся автоматически
+    </div>
+  </div>
+</div>
+
+<!-- ===== APP PAGE ===== -->
+<div id="appPage" style="display:none; flex-direction:column; min-height:100vh;">
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-logo">🐾 PawFinance</div>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="openLimitModal()">📅</button>
+      <button class="icon-btn" onclick="openSettingsModal()">⚙️</button>
+      <button class="icon-btn" onclick="pawApp.logout()">🚪</button>
+    </div>
+  </header>
+
+  <!-- Content -->
+  <div class="app-content">
+
+    <!-- LIMIT ALERT -->
+    <div id="limitAlert" style="display:none">
+      <div class="alert-icon">🚨</div>
+      <div class="alert-text">
+        <div class="alert-title">Лимит превышен!</div>
+        <div class="alert-sub">Перерасход: <span id="excessAmount">0</span> — добавлено в долги</div>
+      </div>
+    </div>
+
+    <!-- ===== DASHBOARD ===== -->
+    <div class="page" id="page-dashboard">
+      <div class="card balance-card">
+        <div class="balance-label">Баланс за месяц</div>
+        <div class="balance-amount" id="balance">0 ₸</div>
+
+        <div class="inc-exp-row">
+          <div class="inc-exp-box income">
+            <div class="label">🐾 Доходы</div>
+            <div id="totalIncome"><span class="amount">0 ₸</span><span class="pct">0%</span></div>
+          </div>
+          <div class="inc-exp-box expense">
+            <div class="label">🐾 Расходы</div>
+            <div id="totalExpense"><span class="amount">0 ₸</span><span class="pct">0%</span></div>
+          </div>
+        </div>
+
+        <div class="health-section">
+          <div>
+            <div class="health-label">Финансовое здоровье</div>
+          </div>
+          <div id="healthBar">❤️❤️❤️❤️❤️</div>
+        </div>
+      </div>
+
+      <div class="card" id="limitCard" style="display:none">
+        <div class="section-title">📅 Дневной лимит</div>
+        <div id="dailyLimitInfo"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">📊 Расходы по категориям</div>
+        <canvas id="expenseChart"></canvas>
+      </div>
+    </div>
+
+    <!-- ===== HISTORY ===== -->
+    <div class="page" id="page-history">
+      <div class="section-title">📋 История транзакций</div>
+      <div class="filter-row">
+        <button class="filter-btn" data-filter="day" onclick="pawApp.setHistoryFilter('day')">День</button>
+        <button class="filter-btn active" data-filter="month" onclick="pawApp.setHistoryFilter('month')">Месяц</button>
+        <button class="filter-btn" data-filter="week" onclick="pawApp.setHistoryFilter('week')">Неделя</button>
+        <button class="filter-btn" data-filter="all" onclick="pawApp.setHistoryFilter('all')">Всё</button>
+      </div>
+      <div id="historyList"></div>
+    </div>
+
+    <!-- ===== CATEGORIES ===== -->
+    <div class="page" id="page-categories">
+      <div class="section-title">🗂️ Категории</div>
+      <div id="categoriesList"></div>
+
+      <div class="card" style="margin-top:1rem;">
+        <div class="section-title">➕ Новая категория</div>
+        <div class="add-cat-form">
+          <input type="text" id="newCatName" class="input-field" placeholder="Название" style="margin:0" />
+          <input type="text" id="newCatEmoji" class="emoji-input" placeholder="🎁" maxlength="2" />
+          <button class="btn-small" onclick="addNewCategory()">Добавить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== GOALS ===== -->
+    <div class="page" id="page-goals">
+      <div class="section-title">🎯 Мои цели</div>
+      <div id="goalsList"></div>
+
+      <div class="card" style="margin-top:1rem;">
+        <div class="section-title">➕ Новая цель</div>
+        <div class="input-group">
+          <label class="input-label">Название цели</label>
+          <input type="text" id="newGoalName" class="input-field" placeholder="Новый iPhone 🍎" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Целевая сумма</label>
+          <input type="number" id="newGoalTarget" class="input-field" placeholder="500000" />
+        </div>
+        <div class="input-group">
+          <label class="input-label">Иконка</label>
+          <input type="text" id="newGoalIcon" class="input-field" placeholder="🎯" maxlength="2" />
+        </div>
+        <button class="btn-primary" onclick="addNewGoal()" style="margin-top:0.5rem;">🐾 Добавить цель</button>
+      </div>
+    </div>
+
+  </div><!-- /app-content -->
+
+  <!-- ===== BOTTOM NAV ===== -->
+  <nav class="app-nav">
+    <button class="nav-item active" data-page="dashboard" onclick="pawApp.showPage('dashboard')">
+      <span class="nav-icon">🐾</span>
+      <span>Главная</span>
+    </button>
+    <button class="nav-item" data-page="history" onclick="pawApp.showPage('history')">
+      <span class="nav-icon">📋</span>
+      <span>История</span>
+    </button>
+    <button class="nav-item" data-page="categories" onclick="pawApp.showPage('categories')">
+      <span class="nav-icon">🗂️</span>
+      <span>Категории</span>
+    </button>
+    <button class="nav-item" data-page="goals" onclick="pawApp.showPage('goals')">
+      <span class="nav-icon">🎯</span>
+      <span>Цели</span>
+    </button>
+  </nav>
+
+  <!-- FAB Add Transaction -->
+  <button class="add-tx-btn" onclick="openAddTxModal()">+</button>
+
+</div><!-- /appPage -->
+
+
+<!-- ===== MODAL: ADD TRANSACTION ===== -->
+<div id="addTxModal" class="modal" onclick="closeModal('addTxModal', event)">
+  <div class="modal-content">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🐾 Новая транзакция</div>
+
+    <div class="type-toggle">
+      <button class="type-btn" id="typeExpense" onclick="setTxType('expense')">💸 Расход</button>
+      <button class="type-btn income-active" id="typeIncome" onclick="setTxType('income')">💰 Доход</button>
+    </div>
+
+    <div class="input-group">
+      <label class="input-label">Сумма</label>
+      <input type="number" id="txAmount" class="input-field" placeholder="1 000" />
+    </div>
+
+    <div class="input-group">
+      <label class="input-label">Категория</label>
+      <select id="txCategory" class="category-select"></select>
+    </div>
+
+    <div class="input-group">
+      <label class="input-label">Описание (необязательно)</label>
+      <input type="text" id="txDescription" class="input-field" placeholder="Обед в кафе 🍜" />
+    </div>
+
+    <button class="btn-primary" onclick="submitTx()">🐾 Добавить</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: CATEGORY DETAIL ===== -->
+<div id="categoryModal" class="modal" onclick="closeModal('categoryModal', event)">
+  <div class="modal-content">
+    <div class="modal-handle"></div>
+    <div id="categoryModalContent"></div>
+    <button class="btn-primary" style="margin-top:1rem;" onclick="document.getElementById('categoryModal').style.display='none'">Закрыть</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: DAILY LIMIT ===== -->
+<div id="limitModal" class="modal" onclick="closeModal('limitModal', event)">
+  <div class="modal-content">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📅 Дневной лимит</div>
+
+    <div style="color:var(--text2);font-size:0.9rem;margin-bottom:1.5rem;text-align:center;">
+      Установите лимит расходов на день. После установки он не изменится до следующего дня.
+    </div>
+
+    <div class="input-group">
+      <label class="input-label">Лимит в день</label>
+      <input type="number" id="limitAmount" class="input-field" placeholder="10000" />
+    </div>
+
+    <div id="limitStatus" style="color:var(--text2);font-size:0.85rem;text-align:center;margin-bottom:1rem;"></div>
+
+    <button class="btn-primary" onclick="submitLimit()">🐾 Установить лимит</button>
+  </div>
+</div>
+
+<!-- ===== MODAL: SETTINGS ===== -->
+<div id="settingsModal" class="modal" onclick="closeModal('settingsModal', event)">
+  <div class="modal-content">
+    <div class="modal-handle"></div>
+    <div class="modal-title">⚙️ Настройки</div>
+
+    <div class="card" style="margin-bottom:1rem;">
+      <div class="section-title" style="font-size:1rem;">💱 Валюта</div>
+      <div class="currency-grid">
+        <button class="currency-btn" onclick="pawApp.setCurrency('KZT')">₸ KZT</button>
+        <button class="currency-btn" onclick="pawApp.setCurrency('RUB')">₽ RUB</button>
+        <button class="currency-btn" onclick="pawApp.setCurrency('USD')">$ USD</button>
+        <button class="currency-btn" onclick="pawApp.setCurrency('EUR')">€ EUR</button>
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="document.getElementById('settingsModal').style.display='none'">Закрыть</button>
+  </div>
+</div>
+
+
+<script>
+// ===================== FIREBASE CONFIG =====================
+// ⬇️ ВСТАВЬТЕ СВОЙ CONFIG ЗДЕСЬ ⬇️
+const firebaseConfig = {
+  apiKey: "AIzaSyBHcoQ2jWYwVZvObe4v1pGg2bjaw-Idxn8",
+  authDomain: "huinya-7adbe.firebaseapp.com",
+  projectId: "huinya-7adbe",
+  storageBucket: "huinya-7adbe.firebasestorage.app",
+  messagingSenderId: "503142124483",
+  appId: "1:503142124483:web:f96c9793d230aff4cb4b76",
+  measurementId: "G-D4HLRK0G2Q"
+};
+// ⬆️ ВСТАВЬТЕ СВОЙ CONFIG ЗДЕСЬ ⬆️
+
+// ===================== INIT =====================
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+const CURRENCY_SYMBOLS = { KZT: '₸', RUB: '₽', USD: '$', EUR: '€' };
+
+const DEFAULT_CATEGORIES = [
+  { id: 'food', name: 'Еда', icon: '🍖', color: '#FF6B6B' },
+  { id: 'transport', name: 'Транспорт', icon: '🚗', color: '#4ECDC4' },
+  { id: 'housing', name: 'Жильё', icon: '🏠', color: '#45B7D1' },
+  { id: 'health', name: 'Здоровье', icon: '💊', color: '#96CEB4' },
+  { id: 'fun', name: 'Развлечения', icon: '🎮', color: '#FFEAA7' },
+  { id: 'clothes', name: 'Одежда', icon: '👗', color: '#DDA0DD' },
+  { id: 'debt', name: 'Долг', icon: '💸', color: '#FF4757', isDebt: true },
+  { id: 'savings', name: 'Накопления', icon: '🐾', color: '#2ed573' },
+];
+
+let state = {
+  user: null,
+  transactions: [],
+  categories: JSON.parse(JSON.stringify(DEFAULT_CATEGORIES)),
+  goals: [],
+  settings: { currency: 'KZT', dailyLimit: 0, limitSetDate: null },
+  currentPage: 'dashboard',
+  historyFilter: 'month',
+  txType: 'expense',
+};
+
+// ===================== AUTH =====================
+auth.onAuthStateChanged(async (user) => {
+  if (user) {
+    state.user = user;
+    await loadUserData();
+    document.getElementById('loginPage').style.display = 'none';
+    document.getElementById('appPage').style.display = 'flex';
+    renderAll();
+    showPage('dashboard');
+  } else {
+    document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('appPage').style.display = 'none';
+  }
+});
+
+// PIN input flow
+document.querySelectorAll('.pin-digit').forEach((input, i, arr) => {
+  input.addEventListener('input', () => {
+    if (input.value && i < arr.length - 1) arr[i + 1].focus();
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Backspace' && !input.value && i > 0) arr[i - 1].focus();
+  });
+});
+
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const email = document.getElementById('loginEmail').value.trim();
+  const digits = [...document.querySelectorAll('.pin-digit')].map(d => d.value).join('');
+  const errEl = document.getElementById('loginError');
+
+  if (!email || digits.length < 4) {
+    errEl.style.display = 'block';
+    errEl.textContent = 'Введите email и PIN (минимум 4 цифры)';
+    return;
+  }
+
+  const password = `PAW_${digits}_FINANCE_2024`;
+  errEl.style.display = 'none';
+  document.getElementById('loginBtn').textContent = '🐾 Загрузка...';
+
+  try {
+    await auth.signInWithEmailAndPassword(email, password);
+  } catch (e) {
+    if (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-login-credentials' || e.code === 'auth/invalid-email') {
+      try {
+        await auth.createUserWithEmailAndPassword(email, password);
+      } catch (e2) {
+        errEl.style.display = 'block';
+        errEl.textContent = e2.message;
+      }
+    } else {
+      errEl.style.display = 'block';
+      errEl.textContent = 'Неверный PIN или ошибка входа';
+    }
+  }
+  document.getElementById('loginBtn').textContent = '🐾 Войти / Зарегистрироваться';
+});
+
+// ===================== DATA =====================
+async function loadUserData() {
+  const uid = state.user.uid;
+  try {
+    const settingsDoc = await db.collection('users').doc(uid).collection('data').doc('settings').get();
+    if (settingsDoc.exists) state.settings = { ...state.settings, ...settingsDoc.data() };
+
+    const catsDoc = await db.collection('users').doc(uid).collection('data').doc('categories').get();
+    if (catsDoc.exists && catsDoc.data().list) state.categories = catsDoc.data().list;
+
+    const txSnap = await db.collection('users').doc(uid).collection('transactions').orderBy('date', 'desc').get();
+    state.transactions = txSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    const goalsSnap = await db.collection('users').doc(uid).collection('goals').get();
+    state.goals = goalsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    checkDailyLimitReset();
+  } catch (e) { console.error('Load error:', e); }
+}
+
+function checkDailyLimitReset() {
+  const today = new Date().toDateString();
+  if (state.settings.limitSetDate !== today) {
+    state.settings.limitSetDate = null;
+  }
+}
+
+async function saveSettings() {
+  if (!state.user) return;
+  await db.collection('users').doc(state.user.uid).collection('data').doc('settings').set(state.settings);
+}
+
+async function saveCategories() {
+  if (!state.user) return;
+  await db.collection('users').doc(state.user.uid).collection('data').doc('categories').set({ list: state.categories });
+}
+
+// ===================== CALCULATIONS =====================
+function formatAmount(amount) {
+  return `${Math.abs(amount).toLocaleString('ru-RU')} ${CURRENCY_SYMBOLS[state.settings.currency] || '₸'}`;
+}
+
+function getCategoryById(id) {
+  return state.categories.find(c => c.id === id) || { name: 'Прочее', icon: '📦', color: '#888' };
+}
+
+function getFilteredTransactions(filter) {
+  const f = filter || state.historyFilter;
+  const now = new Date();
+  return state.transactions.filter(t => {
+    const d = new Date(t.date);
+    if (f === 'day') return d.toDateString() === now.toDateString();
+    if (f === 'week') return d >= new Date(now - 7*24*60*60*1000);
+    if (f === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    return true;
+  });
+}
+
+function getTotals(txList) {
+  const income = txList.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
+  const expense = txList.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  return { income, expense, balance: income - expense };
+}
+
+function getTodayExpenses() {
+  const today = new Date().toDateString();
+  return state.transactions.filter(t => new Date(t.date).toDateString() === today && t.type === 'expense')
+    .reduce((s, t) => s + t.amount, 0);
+}
+
+function getHealthPercent() {
+  const { income, expense } = getTotals(getFilteredTransactions('month'));
+  if (income === 0) return expense > 0 ? 0 : 100;
+  return Math.max(0, Math.min(100, Math.round((1 - expense / income) * 100)));
+}
+
+// ===================== RENDER =====================
+function renderAll() {
+  renderDashboard();
+  renderHistory();
+  renderCategories();
+  renderGoals();
+  renderCategorySelects();
+}
+
+function renderDashboard() {
+  const filtered = getFilteredTransactions('month');
+  const { income, expense, balance } = getTotals(filtered);
+  const health = getHealthPercent();
+  const todayExp = getTodayExpenses();
+  const limit = state.settings.dailyLimit;
+
+  const balEl = document.getElementById('balance');
+  if (balEl) balEl.textContent = `${balance >= 0 ? '' : '-'}${formatAmount(balance)}`;
+
+  const incEl = document.getElementById('totalIncome');
+  const expEl = document.getElementById('totalExpense');
+  const total = income + expense;
+  if (incEl) incEl.innerHTML = `<span class="amount">${formatAmount(income)}</span><span class="pct">${total > 0 ? Math.round(income/total*100) : 0}%</span>`;
+  if (expEl) expEl.innerHTML = `<span class="amount">${formatAmount(expense)}</span><span class="pct">${total > 0 ? Math.round(expense/total*100) : 0}%</span>`;
+
+  const heartsEl = document.getElementById('healthBar');
+  if (heartsEl) {
+    const hearts = Math.round(health / 20);
+    heartsEl.innerHTML = Array.from({length: 5}, (_, i) =>
+      `<span class="heart ${i < hearts ? 'full' : 'empty'}">${i < hearts ? '❤️' : '🖤'}</span>`
+    ).join('') + `<span class="health-pct">${health}%</span>`;
+  }
+
+  // Daily limit display
+  const limitCard = document.getElementById('limitCard');
+  const limitEl = document.getElementById('dailyLimitInfo');
+  if (limitCard && limitEl && limit > 0) {
+    limitCard.style.display = 'block';
+    const pct = Math.min(100, Math.round(todayExp / limit * 100));
+    const color = pct >= 100 ? '#ff4757' : pct > 70 ? '#ffa502' : '#6bcb77';
+    limitEl.innerHTML = `
+      <div class="limit-bar-wrap"><div class="limit-bar" style="width:${pct}%;background:${color}"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:0.85rem;color:var(--text2);margin-top:0.4rem;">
+        <span>Потрачено сегодня: <b style="color:${color}">${formatAmount(todayExp)}</b></span>
+        <span>Лимит: <b>${formatAmount(limit)}</b></span>
+      </div>
+    `;
+  }
+
+  // Limit alert
+  checkDailyLimit();
+  renderChart();
+}
+
+function checkDailyLimit() {
+  const alertEl = document.getElementById('limitAlert');
+  const excessEl = document.getElementById('excessAmount');
+  if (!alertEl) return;
+  const limit = state.settings.dailyLimit;
+  if (!limit) { alertEl.style.display = 'none'; return; }
+  const todayExp = getTodayExpenses();
+  const exceeded = todayExp > limit;
+  alertEl.style.display = exceeded ? 'flex' : 'none';
+  if (exceeded && excessEl) excessEl.textContent = formatAmount(todayExp - limit);
+}
+
+function renderChart() {
+  const canvas = document.getElementById('expenseChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const filtered = getFilteredTransactions('month').filter(t => t.type === 'expense');
+  const byCategory = {};
+  filtered.forEach(t => { byCategory[t.categoryId] = (byCategory[t.categoryId] || 0) + t.amount; });
+  const cats = Object.keys(byCategory);
+
+  if (window._pawChart) { window._pawChart.destroy(); window._pawChart = null; }
+
+  if (cats.length === 0) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(167,164,192,0.5)';
+    ctx.font = '14px Nunito';
+    ctx.textAlign = 'center';
+    ctx.fillText('🐾 Нет расходов за месяц', canvas.width / 2, 80);
+    return;
+  }
+
+  window._pawChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: cats.map(id => `${getCategoryById(id).icon} ${getCategoryById(id).name}`),
+      datasets: [{ data: cats.map(id => byCategory[id]), backgroundColor: cats.map(id => getCategoryById(id).color || '#888'), borderWidth: 3, borderColor: '#1e1c2e' }]
+    },
+    options: { responsive: true, cutout: '65%', plugins: { legend: { labels: { color: '#fffffe', font: { family: 'Nunito', size: 11, weight: '700' } } } } }
+  });
+}
+
+function renderHistory() {
+  const container = document.getElementById('historyList');
+  if (!container) return;
+  const filtered = getFilteredTransactions();
+  if (!filtered.length) { container.innerHTML = '<div class="empty-state">🐾 Нет транзакций за этот период</div>'; return; }
+
+  const groups = {};
+  filtered.forEach(t => {
+    const key = new Date(t.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(t);
+  });
+
+  container.innerHTML = Object.entries(groups).map(([date, txs]) => `
+    <div class="history-group">
+      <div class="history-date">📅 ${date}</div>
+      ${txs.map(t => {
+        const cat = getCategoryById(t.categoryId);
+        return `<div class="tx-item ${t.type}">
+          <div class="tx-icon">${cat.icon}</div>
+          <div class="tx-info">
+            <div class="tx-name">${t.description || cat.name}</div>
+            <div class="tx-cat">${cat.name}</div>
+          </div>
+          <div class="tx-amount ${t.type}">${t.type === 'income' ? '+' : '-'}${formatAmount(t.amount)}</div>
+          <button class="tx-delete" onclick="deleteTx('${t.id}')">×</button>
+        </div>`;
+      }).join('')}
+    </div>
+  `).join('');
+}
+
+function renderCategories() {
+  const container = document.getElementById('categoriesList');
+  if (!container) return;
+  container.innerHTML = state.categories.map(cat => {
+    const txs = state.transactions.filter(t => t.categoryId === cat.id);
+    const total = txs.reduce((s, t) => t.type === 'expense' ? s - t.amount : s + t.amount, 0);
+    return `<div class="cat-card" onclick="showCategoryDetail('${cat.id}')">
+      <div class="cat-icon" style="background:${cat.color}20;border:2px solid ${cat.color}">${cat.icon}</div>
+      <div class="cat-info">
+        <div class="cat-name">${cat.name}</div>
+        <div class="cat-count">${txs.length} транзакций</div>
+      </div>
+      <div class="cat-total ${total >= 0 ? 'positive' : 'negative'}">${total >= 0 ? '+' : '-'}${formatAmount(Math.abs(total))}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderGoals() {
+  const container = document.getElementById('goalsList');
+  if (!container) return;
+  if (!state.goals.length) { container.innerHTML = '<div class="empty-state">🐾 Добавьте свою первую цель!</div>'; return; }
+  container.innerHTML = state.goals.map(goal => {
+    const pct = Math.min(100, Math.round(((goal.saved || 0) / goal.target) * 100));
+    return `<div class="goal-card">
+      <div class="goal-icon">${goal.icon || '🎯'}</div>
+      <div class="goal-info">
+        <div class="goal-name">${goal.name}</div>
+        <div class="goal-progress-wrap">
+          <div class="goal-progress-bar"><div class="goal-progress-fill" style="width:${pct}%"></div></div>
+          <span class="goal-pct">${pct}%</span>
+        </div>
+        <div class="goal-amounts">${formatAmount(goal.saved || 0)} / ${formatAmount(goal.target)}</div>
+      </div>
+      <div class="goal-actions">
+        <button onclick="addToGoal('${goal.id}')">+💰</button>
+        <button onclick="deleteGoal('${goal.id}')">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderCategorySelects() {
+  document.querySelectorAll('.category-select').forEach(sel => {
+    const val = sel.value;
+    sel.innerHTML = state.categories.map(c => `<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
+    if (val) sel.value = val;
+  });
+}
+
+// ===================== NAVIGATION =====================
+function showPage(page) {
+  state.currentPage = page;
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  const el = document.getElementById(`page-${page}`);
+  if (el) el.style.display = 'block';
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const navEl = document.querySelector(`[data-page="${page}"]`);
+  if (navEl) navEl.classList.add('active');
+  if (page === 'dashboard') renderDashboard();
+  if (page === 'history') renderHistory();
+  if (page === 'categories') renderCategories();
+  if (page === 'goals') renderGoals();
+}
+
+function setHistoryFilter(filter) {
+  state.historyFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.querySelector(`[data-filter="${filter}"]`);
+  if (btn) btn.classList.add('active');
+  renderHistory();
+}
+
+// ===================== MODALS =====================
+function openAddTxModal() {
+  renderCategorySelects();
+  setTxType('expense');
+  document.getElementById('txAmount').value = '';
+  document.getElementById('txDescription').value = '';
+  document.getElementById('addTxModal').style.display = 'flex';
+}
+
+function openLimitModal() {
+  const today = new Date().toDateString();
+  const alreadySet = state.settings.limitSetDate === today;
+  const statusEl = document.getElementById('limitStatus');
+  if (alreadySet) {
+    statusEl.textContent = `✅ Сегодняшний лимит: ${formatAmount(state.settings.dailyLimit)}. Изменить можно завтра.`;
+    document.getElementById('limitAmount').disabled = true;
+  } else {
+    statusEl.textContent = state.settings.dailyLimit ? `Текущий лимит: ${formatAmount(state.settings.dailyLimit)}` : 'Лимит не установлен';
+    document.getElementById('limitAmount').disabled = false;
+    document.getElementById('limitAmount').value = state.settings.dailyLimit || '';
+  }
+  document.getElementById('limitModal').style.display = 'flex';
+}
+
+function openSettingsModal() {
+  document.getElementById('settingsModal').style.display = 'flex';
+}
+
+function closeModal(id, event) {
+  if (event.target.id === id) document.getElementById(id).style.display = 'none';
+}
+
+function setTxType(type) {
+  state.txType = type;
+  const expBtn = document.getElementById('typeExpense');
+  const incBtn = document.getElementById('typeIncome');
+  expBtn.className = 'type-btn' + (type === 'expense' ? ' active' : '');
+  incBtn.className = 'type-btn' + (type === 'income' ? ' income-active' : '');
+}
+
+// ===================== ACTIONS =====================
+async function submitTx() {
+  const amount = parseFloat(document.getElementById('txAmount').value);
+  const categoryId = document.getElementById('txCategory').value;
+  const description = document.getElementById('txDescription').value.trim();
+
+  if (!amount || amount <= 0) { alert('Введите сумму'); return; }
+
+  const tx = { type: state.txType, amount, categoryId, description, date: new Date().toISOString() };
+  
+  try {
+    const ref = await db.collection('users').doc(state.user.uid).collection('transactions').add(tx);
+    state.transactions.unshift({ id: ref.id, ...tx });
+    document.getElementById('addTxModal').style.display = 'none';
+    renderAll();
+  } catch (e) { alert('Ошибка: ' + e.message); }
+}
+
+async function deleteTx(id) {
+  if (!confirm('Удалить транзакцию?')) return;
+  await db.collection('users').doc(state.user.uid).collection('transactions').doc(id).delete();
+  state.transactions = state.transactions.filter(t => t.id !== id);
+  renderAll();
+}
+
+async function submitLimit() {
+  const today = new Date().toDateString();
+  if (state.settings.limitSetDate === today) { alert('Лимит уже установлен на сегодня!'); return; }
+  const amount = parseFloat(document.getElementById('limitAmount').value);
+  if (!amount || amount <= 0) { alert('Введите сумму лимита'); return; }
+  state.settings.dailyLimit = amount;
+  state.settings.limitSetDate = today;
+  await saveSettings();
+  document.getElementById('limitModal').style.display = 'none';
+  renderDashboard();
+}
+
+async function setCurrency(currency) {
+  state.settings.currency = currency;
+  await saveSettings();
+  renderAll();
+}
+
+async function addNewCategory() {
+  const name = document.getElementById('newCatName').value.trim();
+  const icon = document.getElementById('newCatEmoji').value.trim() || '📦';
+  if (!name) { alert('Введите название'); return; }
+  const colors = ['#FF6B6B','#4ECDC4','#45B7D1','#96CEB4','#FFEAA7','#DDA0DD','#2ed573','#ffa502'];
+  const cat = { id: `cat_${Date.now()}`, name, icon, color: colors[Math.floor(Math.random()*colors.length)] };
+  state.categories.push(cat);
+  await saveCategories();
+  document.getElementById('newCatName').value = '';
+  document.getElementById('newCatEmoji').value = '';
+  renderCategories();
+  renderCategorySelects();
+}
+
+function showCategoryDetail(catId) {
+  const cat = getCategoryById(catId);
+  const txs = state.transactions.filter(t => t.categoryId === catId);
+  const modal = document.getElementById('categoryModal');
+  const content = document.getElementById('categoryModalContent');
+  const total = txs.reduce((s, t) => t.type === 'expense' ? s - t.amount : s + t.amount, 0);
+  content.innerHTML = `
+    <div class="modal-header">
+      <div class="modal-icon" style="background:${cat.color}20;border:2px solid ${cat.color}">${cat.icon}</div>
+      <h2>${cat.name}</h2>
+    </div>
+    <div class="modal-stats">
+      <span>${txs.length} транзакций</span>
+      <span style="color:${total>=0?'#6bcb77':'#ff4757'}">${total>=0?'+':'-'}${formatAmount(Math.abs(total))}</span>
+    </div>
+    <div class="modal-txlist">
+      ${txs.length === 0 ? '<div class="empty-state">Нет транзакций в этой категории</div>' :
+        txs.map(t => `<div class="tx-item ${t.type}">
+          <div class="tx-icon">${cat.icon}</div>
+          <div class="tx-info">
+            <div class="tx-name">${t.description || cat.name}</div>
+            <div class="tx-cat">${new Date(t.date).toLocaleDateString('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+          </div>
+          <div class="tx-amount ${t.type}">${t.type==='income'?'+':'-'}${formatAmount(t.amount)}</div>
+        </div>`).join('')
+      }
+    </div>
+  `;
+  modal.style.display = 'flex';
+}
+
+async function addNewGoal() {
+  const name = document.getElementById('newGoalName').value.trim();
+  const target = parseFloat(document.getElementById('newGoalTarget').value);
+  const icon = document.getElementById('newGoalIcon').value.trim() || '🎯';
+  if (!name || !target) { alert('Введите название и сумму цели'); return; }
+  const goal = { name, target, icon, saved: 0, createdAt: new Date().toISOString() };
+  try {
+    const ref = await db.collection('users').doc(state.user.uid).collection('goals').add(goal);
+    state.goals.push({ id: ref.id, ...goal });
+    document.getElementById('newGoalName').value = '';
+    document.getElementById('newGoalTarget').value = '';
+    document.getElementById('newGoalIcon').value = '';
+    renderGoals();
+  } catch (e) { alert('Ошибка: ' + e.message); }
+}
+
+async function addToGoal(goalId) {
+  const amount = parseFloat(prompt('💰 Сколько добавить к цели?'));
+  if (!amount || isNaN(amount) || amount <= 0) return;
+  const goal = state.goals.find(g => g.id === goalId);
+  if (!goal) return;
+  const newSaved = (goal.saved || 0) + amount;
+  await db.collection('users').doc(state.user.uid).collection('goals').doc(goalId).update({ saved: newSaved });
+  goal.saved = newSaved;
+  renderGoals();
+}
+
+async function deleteGoal(goalId) {
+  if (!confirm('Удалить цель?')) return;
+  await db.collection('users').doc(state.user.uid).collection('goals').doc(goalId).delete();
+  state.goals = state.goals.filter(g => g.id !== goalId);
+  renderGoals();
+}
+
+async function logout() {
+  await auth.signOut();
+}
+
+// Expose to global for onclick handlers
+window.pawApp = { showPage, setHistoryFilter, deleteTransaction: deleteTx, showCategoryDetail, addToGoal, deleteGoal, setCurrency, logout };
+</script>
+</body>
+</html>
